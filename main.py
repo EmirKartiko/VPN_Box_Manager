@@ -9,12 +9,16 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QFileDialog,
-    QTextEdit,
     QMessageBox,
     QScrollArea,
     QSystemTrayIcon,
     QMenu,
-    QStyle
+    QStyle,
+    QListWidget,
+    QStackedWidget,
+    QGridLayout,
+    QPlainTextEdit,
+    QLabel
 )
 
 from services.password_store import PasswordStore
@@ -22,6 +26,13 @@ from services.vpn_service import VPNService
 
 from widgets.password_dialog import PasswordDialog
 from widgets.vpn_card import VPNCard
+from widgets.add_profile_card import AddProfileCard
+
+from PyQt6.QtGui import QMovie
+from PyQt6.QtCore import (
+    Qt,
+    QSize
+)
 
 
 class MainWindow(QWidget):
@@ -29,14 +40,8 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle(
-            "VPN BOX V2"
-        )
-
-        self.resize(
-            1100,
-            800
-        )
+        self.setWindowTitle("VPN BOX MANAGER")
+        self.resize(1200, 800)
 
         self.password_store = PasswordStore()
         self.vpn_service = VPNService()
@@ -44,110 +49,184 @@ class MainWindow(QWidget):
         self.cards = {}
 
         self.init_ui()
-
         self.load_profiles()
-
         self.setup_tray()
 
     def init_ui(self):
 
-        layout = QVBoxLayout()
+        main_layout = QHBoxLayout()
 
-        top_bar = QHBoxLayout()
+        # Sidebar
+        self.sidebar_container = QWidget()
+        sidebar_layout = QVBoxLayout()
 
-        self.import_btn = QPushButton(
-            "Import OVPN"
+        self.toggle_sidebar_btn = QPushButton("☰")
+        self.toggle_sidebar_btn.clicked.connect(
+            self.toggle_sidebar
         )
 
-        self.disconnect_all_btn = QPushButton(
-            "Disconnect All"
+        self.sidebar = QListWidget()
+        self.sidebar.addItem("Profiles")
+        self.sidebar.addItem("Logs")
+
+        sidebar_layout.addWidget(
+            self.sidebar
         )
 
-        self.clear_log_btn = QPushButton(
-            "Clear Log"
+        sidebar_layout.addStretch()
+
+        self.gif_label = QLabel()
+
+        self.gif_label.setFixedSize(
+            100,
+            100
         )
 
-        self.export_log_btn = QPushButton(
-            "Export Log"
+        self.gif_label.setStyleSheet("""
+        background:transparent;
+        """)
+
+        sidebar_layout.addWidget(
+            self.toggle_sidebar_btn
         )
 
-        self.import_btn.clicked.connect(
-            self.import_profile
+        self.movie = QMovie(
+            "assets/box-cute.gif"
         )
 
-        self.disconnect_all_btn.clicked.connect(
-            self.disconnect_all
+        self.movie.setScaledSize(
+            QSize(
+            70,
+            65
+            )
         )
 
-        self.clear_log_btn.clicked.connect(
-            self.clear_log
+        self.gif_label.setMovie(
+            self.movie
         )
 
-        self.export_log_btn.clicked.connect(
-            self.export_log
+        self.movie.start()
+
+        sidebar_layout.addWidget(
+            self.gif_label,
+            alignment=Qt.AlignmentFlag.AlignCenter
         )
 
-        top_bar.addWidget(
-            self.import_btn
+        self.sidebar_container.setLayout(
+            sidebar_layout
         )
+        self.sidebar.setFixedWidth(130)
 
-        top_bar.addWidget(
-            self.disconnect_all_btn
-        )
+        # Pages
+        self.pages = QStackedWidget()
 
-        top_bar.addWidget(
-            self.clear_log_btn
-        )
-
-        top_bar.addWidget(
-            self.export_log_btn
-        )
-
-        layout.addLayout(
-            top_bar
-        )
+        # Profile page
+        self.profile_page = QWidget()
+        profile_layout = QVBoxLayout()
 
         self.scroll_area = QScrollArea()
-
         self.scroll_widget = QWidget()
 
-        self.card_layout = QVBoxLayout()
+        self.profile_grid = QGridLayout()
+        self.profile_grid.setSpacing(20)
 
         self.scroll_widget.setLayout(
-            self.card_layout
+            self.profile_grid
         )
 
         self.scroll_area.setWidget(
             self.scroll_widget
         )
+        self.scroll_area.setWidgetResizable(True)
 
-        self.scroll_area.setWidgetResizable(
-            True
-        )
-
-        layout.addWidget(
+        profile_layout.addWidget(
             self.scroll_area
         )
 
-        self.log_box = QTextEdit()
-
-        self.log_box.setReadOnly(
-            True
+        self.profile_page.setLayout(
+            profile_layout
         )
 
-        layout.addWidget(
+        # Logs page
+        self.logs_page = QWidget()
+        logs_layout = QVBoxLayout()
+
+        logs_toolbar = QHBoxLayout()
+
+        self.clear_log_btn = QPushButton("Clear")
+        self.export_log_btn = QPushButton("Export")
+
+        self.clear_log_btn.clicked.connect(
+            self.clear_log
+        )
+        self.export_log_btn.clicked.connect(
+            self.export_log
+        )
+
+        logs_toolbar.addWidget(
+            self.clear_log_btn
+        )
+        logs_toolbar.addWidget(
+            self.export_log_btn
+        )
+        logs_toolbar.addStretch()
+
+        self.log_box = QPlainTextEdit()
+        self.log_box.setReadOnly(True)
+
+        logs_layout.addLayout(
+            logs_toolbar
+        )
+        logs_layout.addWidget(
             self.log_box
         )
 
-        self.setLayout(
-            layout
+        self.logs_page.setLayout(
+            logs_layout
         )
+
+        self.pages.addWidget(
+            self.profile_page
+        )
+        self.pages.addWidget(
+            self.logs_page
+        )
+
+        self.sidebar.currentRowChanged.connect(
+            self.pages.setCurrentIndex
+        )
+        self.sidebar.setCurrentRow(0)
+
+        main_layout.addWidget(
+            self.sidebar_container
+        )
+        main_layout.addWidget(
+            self.pages
+        )
+
+        self.status_bar = QLabel("Ready")
+        self.status_bar.setFixedHeight(30)
+
+        wrapper = QVBoxLayout()
+        wrapper.addLayout(main_layout)
+        wrapper.addWidget(self.status_bar)
+
+        self.setLayout(wrapper)
+
+    def toggle_sidebar(self):
+
+        if self.sidebar.isVisible():
+            self.sidebar.hide()
+            self.gif_label.hide()
+            self.sidebar_container.setFixedWidth(60)
+        else:
+            self.sidebar.show()
+            self.gif_label.show()
+            self.sidebar_container.setFixedWidth(150)
 
     def setup_tray(self):
 
-        self.tray = QSystemTrayIcon(
-            self
-        )
+        self.tray = QSystemTrayIcon(self)
 
         self.tray.setIcon(
             self.style().standardIcon(
@@ -157,48 +236,32 @@ class MainWindow(QWidget):
 
         menu = QMenu()
 
-        show_action = menu.addAction(
-            "Show"
-        )
+        menu.addAction("Show", self.showNormal)
+        menu.addAction("Disconnect All", self.disconnect_all)
+        menu.addAction("Exit", self.exit_app)
 
-        disconnect_action = menu.addAction(
-            "Disconnect All"
-        )
-
-        exit_action = menu.addAction(
-            "Exit"
-        )
-
-        show_action.triggered.connect(
-            self.showNormal
-        )
-
-        disconnect_action.triggered.connect(
-            self.disconnect_all
-        )
-
-        exit_action.triggered.connect(
-            self.exit_app
-        )
-
-        self.tray.setContextMenu(
-            menu
-        )
-
+        self.tray.setContextMenu(menu)
         self.tray.show()
+
+    def clear_grid(self):
+
+        while self.profile_grid.count():
+            item = self.profile_grid.takeAt(0)
+            widget = item.widget()
+
+            if widget:
+                widget.setParent(None)
 
     def load_profiles(self):
 
+        self.clear_grid()
+        self.cards = {}
+
         profiles = self.vpn_service.get_profiles()
 
-        for profile in profiles:
+        for index, profile in enumerate(profiles):
 
-            if profile in self.cards:
-                continue
-
-            card = VPNCard(
-                profile
-            )
+            card = VPNCard(profile)
 
             card.connect_clicked.connect(
                 self.connect_vpn
@@ -212,19 +275,40 @@ class MainWindow(QWidget):
                 self.delete_profile
             )
 
-            self.cards[
-                profile
-            ] = card
+            self.cards[profile] = card
 
-            self.card_layout.addWidget(
-                card
+            row = index // 2
+            col = index % 2
+
+            self.profile_grid.addWidget(
+                card,
+                row,
+                col
             )
+
+        self.add_add_card()
+
+    def add_add_card(self):
+
+        add_card = AddProfileCard()
+
+        add_card.clicked.connect(
+            self.import_profile
+        )
+
+        count = len(self.cards)
+
+        self.profile_grid.addWidget(
+            add_card,
+            count // 2,
+            count % 2
+        )
 
     def import_profile(self):
 
         file_name, _ = QFileDialog.getOpenFileName(
             self,
-            "Select OVPN",
+            "Select OpenVPN Profile",
             "",
             "*.ovpn"
         )
@@ -232,41 +316,31 @@ class MainWindow(QWidget):
         if not file_name:
             return
 
+        os.makedirs(
+            "profiles",
+            exist_ok=True
+        )
+
         target = os.path.join(
             "profiles",
-            os.path.basename(
-                file_name
+            os.path.basename(file_name)
+        )
+
+        shutil.copy(file_name, target)
+
+        profile_name = os.path.basename(file_name)
+
+        dialog = PasswordDialog(profile_name)
+
+        if dialog.exec() and dialog.remember_password():
+            self.password_store.set_password(
+                profile_name,
+                dialog.get_password()
             )
-        )
-
-        shutil.copy(
-            file_name,
-            target
-        )
-
-        profile_name = os.path.basename(
-            file_name
-        )
-
-        dialog = PasswordDialog(
-            profile_name
-        )
-
-        if dialog.exec():
-
-            if dialog.remember_password():
-
-                self.password_store.set_password(
-                    profile_name,
-                    dialog.get_password()
-                )
 
         self.load_profiles()
 
-    def connect_vpn(
-        self,
-        profile_name
-    ):
+    def connect_vpn(self, profile_name):
 
         password = self.password_store.get_password(
             profile_name
@@ -274,9 +348,7 @@ class MainWindow(QWidget):
 
         if not password:
 
-            dialog = PasswordDialog(
-                profile_name
-            )
+            dialog = PasswordDialog(profile_name)
 
             if not dialog.exec():
                 return
@@ -284,7 +356,6 @@ class MainWindow(QWidget):
             password = dialog.get_password()
 
             if dialog.remember_password():
-
                 self.password_store.set_password(
                     profile_name,
                     password
@@ -298,28 +369,14 @@ class MainWindow(QWidget):
         if not worker:
             return
 
-        worker.log_signal.connect(
-            self.add_log
-        )
-
-        worker.status_signal.connect(
-            self.update_status
-        )
-
-        worker.ip_signal.connect(
-            self.update_ip
-        )
-
-        worker.duration_signal.connect(
-            self.update_duration
-        )
+        worker.log_signal.connect(self.add_log)
+        worker.status_signal.connect(self.update_status)
+        worker.ip_signal.connect(self.update_ip)
+        worker.duration_signal.connect(self.update_duration)
 
         worker.start()
 
-    def disconnect_vpn(
-        self,
-        profile_name
-    ):
+    def disconnect_vpn(self, profile_name):
 
         self.vpn_service.disconnect_vpn(
             profile_name
@@ -345,15 +402,8 @@ class MainWindow(QWidget):
         if not filename:
             return
 
-        with open(
-            filename,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            f.write(
-                self.log_box.toPlainText()
-            )
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(self.log_box.toPlainText())
 
         QMessageBox.information(
             self,
@@ -361,15 +411,12 @@ class MainWindow(QWidget):
             "Log exported successfully"
         )
 
-    def delete_profile(
-        self,
-        profile_name
-    ):
+    def delete_profile(self, profile_name):
 
         reply = QMessageBox.question(
             self,
             "Delete Profile",
-            f"Delete profile '{profile_name}' ?",
+            f"Delete {profile_name}?",
             QMessageBox.StandardButton.Yes |
             QMessageBox.StandardButton.No
         )
@@ -386,86 +433,32 @@ class MainWindow(QWidget):
             profile_name
         )
 
-        if os.path.exists(
-            profile_path
-        ):
-            os.remove(
-                profile_path
-            )
+        if os.path.exists(profile_path):
+            os.remove(profile_path)
 
-        card = self.cards.pop(
-            profile_name,
-            None
-        )
+        self.load_profiles()
 
-        if card:
+    def add_log(self, text):
 
-            card.setParent(None)
+        self.log_box.appendPlainText(text)
 
-            card.deleteLater()
+    def update_status(self, status, profile_name):
 
-        self.add_log(
-            f"[SYSTEM] Deleted profile {profile_name}"
-        )
-
-    def add_log(
-        self,
-        text
-    ):
-
-        self.log_box.append(
-            text
-        )
-
-        while (
-            self.log_box.document().blockCount()
-            > 5000
-        ):
-            cursor = self.log_box.textCursor()
-
-            cursor.movePosition(
-                cursor.MoveOperation.Start
-            )
-
-            cursor.select(
-                cursor.SelectionType.BlockUnderCursor
-            )
-
-            cursor.removeSelectedText()
-
-            cursor.deleteChar()
-
-    def update_status(
-        self,
-        status,
-        profile_name
-    ):
-
-        card = self.cards.get(
-            profile_name
-        )
+        card = self.cards.get(profile_name)
 
         if card:
+            card.set_status(status)
 
-            card.set_status(
-                status
-            )
-
-    def update_ip(
-        self,
-        profile_name,
-        ip
-    ):
-
-        card = self.cards.get(
-            profile_name
+        self.status_bar.setText(
+            f"{profile_name} : {status}"
         )
 
-        if card:
+    def update_ip(self, profile_name, ip):
 
-            card.set_ip(
-                ip
-            )
+        card = self.cards.get(profile_name)
+
+        if card:
+            card.set_ip(ip)
 
     def update_duration(
         self,
@@ -473,42 +466,45 @@ class MainWindow(QWidget):
         duration
     ):
 
-        card = self.cards.get(
-            profile_name
-        )
+        card = self.cards.get(profile_name)
 
         if card:
+            card.set_duration(duration)
 
-            card.set_duration(
-                duration
-            )
-
-    def closeEvent(
-        self,
-        event
-    ):
+    def closeEvent(self, event):
 
         self.hide()
-
         event.ignore()
 
     def exit_app(self):
 
         self.vpn_service.disconnect_all()
-
         QApplication.quit()
 
 
 if __name__ == "__main__":
 
-    app = QApplication(
-        sys.argv
-    )
+    app = QApplication(sys.argv)
+
+    app.setStyleSheet("""
+    QWidget{
+        background:#08123a;
+        color:white;
+        font-family:Segoe UI;
+    }
+
+    QListWidget{
+        background:#6b6b6b;
+        border:none;
+    }
+
+    QPlainTextEdit{
+        background:black;
+        color:#00ff66;
+    }
+    """)
 
     window = MainWindow()
-
     window.show()
 
-    sys.exit(
-        app.exec()
-    )
+    sys.exit(app.exec())

@@ -1,12 +1,11 @@
 from PyQt6.QtWidgets import (
     QFrame,
     QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QHBoxLayout
+    QPushButton
 )
 
 from PyQt6.QtCore import (
+    Qt,
     pyqtSignal
 )
 
@@ -21,132 +20,129 @@ class VPNCard(QFrame):
         super().__init__()
 
         self.profile_name = profile_name
+        self.connected = False
 
-        self.setFrameShape(
-            QFrame.Shape.Box
-        )
+        self.setFixedSize(280, 150)
 
-        self.setLineWidth(1)
+        self.setStyleSheet("""
+        QFrame{
+            background:#555555;
+            border-radius:18px;
+        }
+        """)
 
-        layout = QVBoxLayout()
+        self.title = QLabel(profile_name, self)
+        self.title.move(20, 20)
 
-        self.title_label = QLabel(
-            profile_name
-        )
+        self.title.setStyleSheet("""
+        color:white;
+        font-size:15px;
+        font-weight:bold;
+        background:transparent;
+        """)
 
-        self.status_label = QLabel(
-            "Status : 🔴 Disconnected"
-        )
+        self.ip_label = QLabel("-", self)
+        self.ip_label.move(20, 60)
 
-        self.ip_label = QLabel(
-            "VPN IP : -"
-        )
+        self.ip_label.setStyleSheet("""
+        color:#dddddd;
+        background:transparent;
+        """)
 
-        self.duration_label = QLabel(
-            "Connected : -"
-        )
+        self.duration_label = QLabel("-", self)
+        self.duration_label.move(20, 85)
 
-        layout.addWidget(
-            self.title_label
-        )
+        self.duration_label.setStyleSheet("""
+        color:#dddddd;
+        background:transparent;
+        """)
 
-        layout.addWidget(
-            self.status_label
-        )
+        self.delete_btn = QPushButton(self)
+        self.delete_btn.setGeometry(240, 10, 25, 25)
 
-        layout.addWidget(
-            self.ip_label
-        )
-
-        layout.addWidget(
-            self.duration_label
-        )
-
-        button_layout = QHBoxLayout()
-
-        self.connect_btn = QPushButton(
-            "Connect"
-        )
-
-        self.disconnect_btn = QPushButton(
-            "Disconnect"
-        )
-
-        self.delete_btn = QPushButton(
-            "Delete"
-        )
-
-        self.connect_btn.clicked.connect(
-            self.emit_connect
-        )
-
-        self.disconnect_btn.clicked.connect(
-            self.emit_disconnect
-        )
+        self.delete_btn.setStyleSheet("""
+        QPushButton{
+            background:red;
+            border-radius:12px;
+        }
+        """)
 
         self.delete_btn.clicked.connect(
-            self.emit_delete
+            lambda:
+            self.delete_clicked.emit(
+                self.profile_name
+            )
         )
 
-        button_layout.addWidget(
-            self.connect_btn
+        self.power_btn = QPushButton(self)
+        self.power_btn.setGeometry(240, 115, 25, 25)
+
+        self.power_btn.setStyleSheet("""
+        QPushButton{
+            background:#222;
+            border-radius:12px;
+        }
+        """)
+
+        self.power_btn.clicked.connect(
+            self.toggle_connection
         )
 
-        button_layout.addWidget(
-            self.disconnect_btn
-        )
+    def toggle_connection(self):
 
-        button_layout.addWidget(
-            self.delete_btn
-        )
+        if self.connected:
 
-        layout.addLayout(
-            button_layout
-        )
+            self.disconnect_clicked.emit(
+                self.profile_name
+            )
 
-        self.setLayout(layout)
+        else:
 
-    def emit_connect(self):
+            self.connect_clicked.emit(
+                self.profile_name
+            )
 
-        self.connect_clicked.emit(
-            self.profile_name
-        )
+    def set_status(self, status):
 
-    def emit_disconnect(self):
+        if "Connected" in status:
 
-        self.disconnect_clicked.emit(
-            self.profile_name
-        )
+            self.connected = True
 
-    def emit_delete(self):
+            self.power_btn.setStyleSheet("""
+            QPushButton{
+                background:limegreen;
+                border-radius:12px;
+            }
+            """)
 
-        self.delete_clicked.emit(
-            self.profile_name
-        )
+        elif "Connecting" in status:
 
-    def set_status(
-        self,
-        status
-    ):
+            self.power_btn.setStyleSheet("""
+            QPushButton{
+                background:yellow;
+                border-radius:12px;
+            }
+            """)
 
-        self.status_label.setText(
-            f"Status : {status}"
-        )
+        else:
 
-    def set_ip(
-        self,
-        ip
-    ):
+            self.connected = False
+
+            self.power_btn.setStyleSheet("""
+            QPushButton{
+                background:#222;
+                border-radius:12px;
+            }
+            """)
+
+    def set_ip(self, ip):
 
         self.ip_label.setText(
-            f"VPN IP : {ip}"
+            f"IP : {ip}"
         )
 
-    def set_duration(
-        self,
-        duration
-    ):
+    def set_duration(self, duration):
 
         self.duration_label.setText(
-            f"Connected : {duration}"
+            duration
         )
